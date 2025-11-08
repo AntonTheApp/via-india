@@ -1,0 +1,9 @@
+# Development dependencies for local testing
+fastapi[standard]
+mangum
+uvicorn[standard]
+pydantic[email]
+boto3
+pytest
+pytest-asyncio
+httpx  # For testing FastAPI endpoints

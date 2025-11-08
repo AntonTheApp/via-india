@@ -4,3 +4,4 @@ via-india-cdk/via-india-lambda-layer/python/*
 via-india-cdk/cdk.out
 via-india-cdk/cdk.out/*
 via-india-cdk/via_india_cdk/__pycache__/
+via-india-lambda/app/__pycache__/
