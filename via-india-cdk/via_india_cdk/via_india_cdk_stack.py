@@ -1,6 +1,7 @@
 from aws_cdk import (
     Duration,
     Stack,
+    Fn,
     aws_lambda as _lambda,
     aws_apigateway as apigw,
 )
@@ -11,12 +12,11 @@ class ViaIndiaCdkStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Lambda via-india-lambda-layer for dependencies
-        fastapi_layer = _lambda.LayerVersion(
-            self, "FastAPILayer",
-            code=_lambda.Code.from_asset("./via-india-lambda-layer"),
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
-            description="FastAPI + Mangum dependencies",
+        # Import the FastAPI layer from the LayerStack
+        layer_arn = Fn.import_value("ViaIndiaFastAPILayerArn")
+        fastapi_layer = _lambda.LayerVersion.from_layer_version_arn(
+            self, "ImportedFastAPILayer",
+            layer_version_arn=layer_arn
         )
 
         fastapi_lambda = _lambda.Function(
