@@ -25,15 +25,6 @@ step to activate your virtualenv.
 $ source .venv/bin/activate
 ```
 
-Our lambda needs a lambda layer to package dependencies.
-Install the dependencies with below command(needs Docker installed locally)
-
-```
-docker run --rm -v "$PWD":/var/task -w /var/task \
-  public.ecr.aws/sam/build-python3.12 \
-  pip install -r via-india-lambda-layer/requirements.txt -t via-india-lambda-layer/python
-```
-
 If you are a Windows platform, you would activate the virtualenv like this:
 
 ```
@@ -52,6 +43,27 @@ Add AWS credentials
 
 ```
 $ cdk synth
+```
+
+Our lambda needs a lambda layer to package dependencies.
+Install the dependencies with below command(needs Docker installed locally)
+
+```
+docker run --rm -v "$PWD":/var/task -w /var/task \
+  public.ecr.aws/sam/build-python3.12 \
+  pip install -r via-india-lambda-layer/requirements.txt -t via-india-lambda-layer/python
+```
+
+Then deploy to AWS account
+
+```
+cdk deploy
+```
+
+Alternatively, use the Makefile that runs the above two commands
+
+```
+make deploy
 ```
 
 To add additional dependencies, for example other CDK libraries, just add

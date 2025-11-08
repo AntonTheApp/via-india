@@ -14,7 +14,7 @@ class ViaIndiaCdkStack(Stack):
         # Lambda via-india-lambda-layer for dependencies
         fastapi_layer = _lambda.LayerVersion(
             self, "FastAPILayer",
-            code=_lambda.Code.from_asset("../via-india-lambda-layer"),
+            code=_lambda.Code.from_asset("./via-india-lambda-layer"),
             compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
             description="FastAPI + Mangum dependencies",
         )
