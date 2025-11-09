@@ -49,17 +49,20 @@ class ViaIndiaCdkStack(Stack):
 
         # Grant Lambda permissions to access DynamoDB tables
         # Import table objects to grant permissions
-        users_table = dynamodb.Table.from_table_arn(
+        users_table = dynamodb.Table.from_table_attributes(
             self, "ImportedUsersTable",
-            table_arn=users_table_arn
+            table_arn=users_table_arn,
+            grant_index_permissions=True,
         )
-        requests_table = dynamodb.Table.from_table_arn(
+        requests_table = dynamodb.Table.from_table_attributes(
             self, "ImportedRequestsTable",
-            table_arn=requests_table_arn
+            table_arn=requests_table_arn,
+            grant_index_permissions=True,
         )
-        matches_table = dynamodb.Table.from_table_arn(
+        matches_table = dynamodb.Table.from_table_attributes(
             self, "ImportedMatchesTable",
-            table_arn=matches_table_arn
+            table_arn=matches_table_arn,
+            grant_index_permissions=True,
         )
 
         # Grant read/write permissions
