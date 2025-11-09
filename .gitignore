@@ -5,3 +5,4 @@ via-india-cdk/cdk.out
 via-india-cdk/cdk.out/*
 via-india-cdk/via_india_cdk/__pycache__/
 via-india-lambda/app/__pycache__/
+via-india-requests-bruno/*
