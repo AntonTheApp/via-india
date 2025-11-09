@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigw,
     aws_dynamodb as dynamodb,
+    aws_ssm as ssm,
 )
 from constructs import Construct
 
@@ -13,8 +14,10 @@ class ViaIndiaCdkStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Import the FastAPI layer from the LayerStack
-        layer_arn = Fn.import_value("ViaIndiaFastAPILayerArn")
+        # Get the FastAPI layer ARN from SSM Parameter Store (no export dependency)
+        layer_arn = ssm.StringParameter.value_for_string_parameter(
+            self, "/via-india/layer/fastapi-arn"
+        )
         fastapi_layer = _lambda.LayerVersion.from_layer_version_arn(
             self, "ImportedFastAPILayer",
             layer_version_arn=layer_arn
@@ -43,7 +46,7 @@ class ViaIndiaCdkStack(Stack):
                 "USERS_TABLE_NAME": users_table_name,
                 "REQUESTS_TABLE_NAME": requests_table_name,
                 "MATCHES_TABLE_NAME": matches_table_name,
-                "AWS_REGION": self.region,
+                "DEPLOYED_AWS_REGION": self.region,
             }
         )
 

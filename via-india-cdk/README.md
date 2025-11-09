@@ -1,76 +1,262 @@
+# Via India CDK Infrastructure
 
-# Welcome to your CDK Python project!
+This CDK project implements the **Via India Travel Companion Platform** - a serverless backend for matching travel companions within company networks.
 
-This is a blank project for CDK development with Python.
+## 🏗️ Architecture Overview
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
-
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
-
-To manually create a virtualenv on MacOS and Linux:
+The project uses a **three-stack architecture** designed for independent deployments and cost efficiency:
 
 ```
-$ python3 -m venv .venv
+┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
+│  ViaIndiaDatabaseStack  │    │  ViaIndiaLayerStack   │    │  ViaIndiaCdkStack     │
+│                     │    │                     │    │                     │
+│  • DynamoDB Tables  │    │  • Lambda Layer     │    │  • Lambda Function  │
+│  • GSI Optimization │    │  • FastAPI/Mangum   │    │  • API Gateway      │
+│  • Cross-stack      │    │  • Auto-bundling    │    │  • Permissions      │
+│    Exports          │    │  • SSM Parameter    │    │  • SSM Lookup       │
+└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
 ```
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
+## 📦 Stack Dependencies
 
+### **Dependency Management Strategy**
+
+We use **SSM Parameter Store** instead of CloudFormation exports for layer dependencies to enable independent deployments:
+
+- **Database Stack** → **Main Stack**: Traditional exports (tables rarely change)
+- **Layer Stack** → **Main Stack**: **SSM Parameter Store** (enables independent layer updates)
+
+### **Why SSM Parameter Store?**
+
+**Problem**: CloudFormation exports create deployment dependencies. When a Lambda layer is redeployed, AWS creates a new layer version with a new ARN. This changes the export value, but CDK blocks the update because the main stack is importing it.
+
+**Solution**: Store the layer ARN in SSM Parameter Store instead of exports:
+
+```python
+# Layer Stack: Stores ARN in SSM
+ssm.StringParameter(
+    parameter_name="/via-india/layer/fastapi-arn",
+    string_value=layer.layer_version_arn
+)
+
+# Main Stack: Reads from SSM (no dependency)
+layer_arn = ssm.StringParameter.value_for_string_parameter(
+    self, "/via-india/layer/fastapi-arn"
+)
 ```
-$ source .venv/bin/activate
-```
 
-If you are a Windows platform, you would activate the virtualenv like this:
+## 🚀 Deployment Strategies
 
-```
-% .venv\Scripts\activate.bat
-```
-
-Once the virtualenv is activated, you can install the required dependencies.
-
-```
-$ pip install -r requirements.txt
-```
-
-At this point you can now synthesize the CloudFormation template for this code.
-
-Add AWS credentials
-
-```
-$ cdk synth
-```
-
-Synth creates the CFn template files for all the Stacks defined in app.py
-
-Our lambda needs a lambda layer to package dependencies.
-This lambda layer is created in its own stack `ViaIndiaLayerStack`.
-Deploy this stack first, if deploying to your account for the first time or if any lambda dependencies changed after last deployment.
-
-```
+### **Initial Setup (First Time)**
+```bash
+# Deploy all stacks in dependency order
+cdk deploy ViaIndiaDatabaseStack
 cdk deploy ViaIndiaLayerStack
-```
-
-Then deploy the main lambda stack to your AWS account
-
-```
 cdk deploy ViaIndiaCdkStack
 ```
 
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
+### **Regular Development Workflow**
 
-## Useful commands
+#### **When Only Lambda Code Changes** (Most Common)
+```bash
+# Deploy just the main stack - fast iteration!
+cdk deploy ViaIndiaCdkStack
+```
 
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
+#### **When Layer Dependencies Change** (Rare)
+```bash
+# 1. Update layer with new dependencies
+cdk deploy ViaIndiaLayerStack
 
-Enjoy!
+# 2. Deploy main stack to use new layer version
+cdk deploy ViaIndiaCdkStack
+```
+
+#### **When Database Schema Changes** (Rare)
+```bash
+# Deploy database first, then main stack
+cdk deploy ViaIndiaDatabaseStack ViaIndiaCdkStack
+```
+
+### **Emergency: Force All Updates**
+```bash
+# Deploy all stacks together (handles all dependencies)
+cdk deploy --all
+```
+
+## 🛠️ Development Setup
+
+### **Prerequisites**
+- Python 3.9+
+- Node.js 18+ (for CDK)
+- Docker (for Lambda layer building)
+- AWS CLI configured
+
+### **Initial Setup**
+```bash
+# 1. Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate.bat
+
+# 2. Install CDK dependencies
+pip install -r requirements.txt
+
+# 3. Install CDK CLI (if not installed)
+npm install -g aws-cdk
+
+# 4. Verify setup
+cdk ls
+```
+
+### **Local Development**
+```bash
+# Test Lambda code locally (in ../via-india-lambda/)
+cd ../via-india-lambda
+python run_local.py  # Starts FastAPI server on localhost:8000
+```
+
+## 📁 Project Structure
+
+```
+via-india-cdk/
+├── app.py                          # CDK app entry point
+├── cdk.json                        # CDK configuration
+├── requirements.txt                # CDK dependencies
+├── via_india_cdk/
+│   ├── database_stack.py           # DynamoDB tables and GSIs
+│   ├── layer_stack.py              # Lambda layer with SSM parameter
+│   └── via_india_cdk_stack.py      # Main Lambda + API Gateway
+└── via-india-lambda-layer/
+    └── requirements.txt            # Layer dependencies (FastAPI, etc.)
+```
+
+## 🔍 Stack Details
+
+### **ViaIndiaDatabaseStack**
+- **Users Table**: Company email validation, verification workflow
+- **Requests Table**: Travel requests with route-based matching GSIs
+- **Matches Table**: Companion matching with consent tracking
+- **Exports**: Table names and ARNs for main stack import
+
+### **ViaIndiaLayerStack**
+- **FastAPI Layer**: Auto-bundled with Docker for ARM64
+- **Dependencies**: FastAPI, Mangum, Uvicorn, Pydantic[email]
+- **SSM Parameter**: `/via-india/layer/fastapi-arn` stores layer ARN
+- **No Exports**: Uses SSM to avoid deployment conflicts
+
+### **ViaIndiaCdkStack**
+- **Lambda Function**: FastAPI app with Mangum adapter
+- **API Gateway**: RESTful API with CORS enabled
+- **Imports**: Database tables from exports, layer ARN from SSM
+- **Permissions**: Read/write access to DynamoDB tables
+
+## ⚡ Performance Optimizations
+
+### **Layer Management**
+- **ARM64 Architecture**: Better price/performance ratio
+- **Optimized Dependencies**: No boto3 (AWS provides it)
+- **Docker Bundling**: Consistent, platform-specific builds
+- **Independent Updates**: Only rebuild when dependencies change
+
+### **Database Design**
+- **Global Secondary Indexes**: Fast queries by email, route, status
+- **Composite Keys**: Route matching with `origin-destination` format
+- **Pay-per-request**: Cost-effective scaling
+
+## 🐛 Troubleshooting
+
+### **Common CDK Deployment Issues**
+
+#### **"Export in use" Error**
+```
+Update canceled. Cannot update export ViaIndiaFastAPILayerArn as it is in use by ViaIndiaCdkStack.
+```
+**Solution**: This shouldn't happen with SSM Parameter Store approach. If you see this, verify you're using the updated stacks with SSM parameters.
+
+#### **Layer Build Failures**
+```
+docker: command not found
+```
+**Solution**: Install Docker and ensure it's running before deploying layer stack.
+
+#### **Permission Denied During Build**
+```
+Permission denied while trying to connect to Docker daemon
+```
+**Solution**:
+- **macOS/Linux**: `sudo usermod -aG docker $USER` (logout/login required)
+- **Windows**: Run as Administrator or add user to docker-users group
+
+### **Local Development Issues**
+
+#### **Import Errors in Local Testing**
+```
+ModuleNotFoundError: No module named 'models'
+```
+**Solution**: Use the provided `run_local.py` script instead of running `uvicorn` directly.
+
+#### **DynamoDB Connection Errors (Expected)**
+Local development won't connect to AWS DynamoDB. This is expected - use local testing for API validation, deploy to AWS for full integration testing.
+
+## 📚 API Endpoints
+
+Once deployed, your API provides:
+
+- **Health**: `GET /` and `GET /health`
+- **Users**: `POST /users`, `GET /users/{id}`, `POST /users/{id}/verify`
+- **Requests**: `POST /requests`, `GET /requests/{id}`, `GET /users/{id}/requests`
+- **Matching**: `GET /requests/{id}/matches`
+
+Interactive API documentation available at: `https://your-api-gateway-url/docs`
+
+## 🔄 CI/CD Considerations
+
+### **Recommended Pipeline**
+1. **PR Validation**: `cdk synth` to validate templates
+2. **Layer Updates**: Deploy layer stack when `requirements.txt` changes
+3. **Code Updates**: Deploy main stack for Lambda code changes
+4. **Integration Tests**: Test deployed API endpoints
+
+### **Environment Strategy**
+- **Development**: Independent developer stacks
+- **Staging**: Shared staging environment
+- **Production**: Separate AWS account with approval gates
+
+## 📈 Monitoring
+
+### **CloudWatch Logs**
+```bash
+# View Lambda logs
+aws logs tail /aws/lambda/ViaIndiaCdkStack-TravelCompanionLambda --follow
+```
+
+### **Key Metrics**
+- Lambda duration and error rate
+- API Gateway 4xx/5xx errors
+- DynamoDB read/write capacity
+- Layer cold start performance
+
+## 🚀 Next Steps (Phase 2)
+
+The current Phase 1 foundation supports:
+- User registration and verification
+- Travel request creation and matching
+- RESTful API with comprehensive logging
+
+**Phase 2 additions:**
+- WhatsApp bot integration
+- Email verification with SES
+- Enhanced matching algorithm with scoring
+- Real-time notifications
+
+---
+
+## 📞 Support
+
+For questions or issues:
+1. Check this README for common solutions
+2. Review CloudWatch logs for runtime errors
+3. Use `cdk diff` to preview changes before deployment
+4. Test locally with `run_local.py` for faster iteration
+
+**Happy coding!** 🚀

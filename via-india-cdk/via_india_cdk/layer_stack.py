@@ -1,7 +1,7 @@
 from aws_cdk import (
     Stack,
     aws_lambda as _lambda,
-    CfnOutput,
+    aws_ssm as ssm,
     BundlingOptions,
 )
 from constructs import Construct
@@ -28,10 +28,10 @@ class LayerStack(Stack):
             description="FastAPI + Mangum dependencies for via-india (auto-bundled)",
         )
 
-        # Export the layer ARN so other stacks can import it
-        CfnOutput(
-            self, "FastAPILayerArn",
-            value=self.fastapi_layer.layer_version_arn,
-            export_name="ViaIndiaFastAPILayerArn",
-            description="ARN of the FastAPI Lambda Layer"
+        # Store layer ARN in SSM Parameter Store for independent deployments
+        ssm.StringParameter(
+            self, "FastAPILayerArnParameter",
+            parameter_name="/via-india/layer/fastapi-arn",
+            string_value=self.fastapi_layer.layer_version_arn,
+            description="FastAPI Lambda Layer ARN for Via India"
         )
