@@ -202,12 +202,90 @@ Local development won't connect to AWS DynamoDB. This is expected - use local te
 
 Once deployed, your API provides:
 
-- **Health**: `GET /` and `GET /health`
-- **Users**: `POST /users`, `GET /users/{id}`, `POST /users/{id}/verify`
-- **Requests**: `POST /requests`, `GET /requests/{id}`, `GET /users/{id}/requests`
+
+
 - **Matching**: `GET /requests/{id}/matches`
 
 Interactive API documentation available at: `https://your-api-gateway-url/docs`
+
+### Testing from API Gateway Console
+Go to AWS API Gateway Console: API Gateway/APIs/Resources - TravelCompanionAPI
+Resources-> /{proxy+} - ANY - Method execution
+
+Use below Method Type, proxy, Request Body based on the operation:
+
+- **Health**: `GET /` and `GET /health`
+- **Users**: 
+`POST /users`
+{
+    "email": "john.doe@example.com",
+    "name": "John Doe",
+    "phone": "+1234567890"
+  }
+
+`GET /users/{id}`
+Sample id: ec9d61c0-94cf-49ab-9d5d-d885817ccd60
+
+`POST /users/{id}/verify`
+Empty body
+Sample id: ec9d61c0-94cf-49ab-9d5d-d885817ccd60
+
+- **Requests**: 
+`POST /requests`
+
+query param: user_id=ec9d61c0-94cf-49ab-9d5d-d885817ccd60
+{
+  "type": "need_help",
+  "route": {
+    "origin": "DEL",
+    "destination": "JFK"
+  },
+  "travel_dates": {
+    "departure": "2025-12-15",
+    "return": "2025-12-30",
+    "flexible": false
+  },
+  "passenger_details": {
+    "name": "Anita Sharma",
+    "age": 67,
+    "special_needs": "Wheelchair assistance at airport",
+    "languages": ["Hindi"]
+  },
+  "status": "active",
+  "notes": "Needs help with check-in and immigration formalities."
+}
+
+query param: user_id=cdfe2c71-bf76-41d5-8203-f40982e6d6bd
+{
+  "type": "offer_help",
+  "route": {
+    "origin": "JFK",
+    "destination": "DEL"
+  },
+  "travel_dates": {
+    "departure": "2025-12-14",
+    "return": "2025-12-16",
+    "flexible": true
+  },
+  "helper_details": {
+    "experience": "Frequently travels to India, comfortable assisting seniors",
+    "languages": ["English", "Hindi"],
+    "availability": "Can assist at JFK on 2025-12-14"
+  },
+  "status": "active",
+  "notes": "Can help with airport navigation and boarding."
+}
+
+`GET /requests/{id}`
+Sample request ID: 862c09ee-f4be-4a5d-8232-a41c6df97145
+
+`GET /users/{id}/requests`
+Sample user ID with requests: ec9d61c0-94cf-49ab-9d5d-d885817ccd60
+
+`GET /requests/{request_id}/matches`
+Sample request ID with matches: 862c09ee-f4be-4a5d-8232-a41c6df97145
+
+
 
 ## 🔄 CI/CD Considerations
 

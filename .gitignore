@@ -1,5 +1,6 @@
 .idea/*
 .venv/
+*.pkg
 via-india-cdk/via-india-lambda-layer/python/*
 via-india-cdk/cdk.out
 via-india-cdk/cdk.out/*
