@@ -7,3 +7,13 @@ via-india-cdk/cdk.out/*
 via-india-cdk/via_india_cdk/__pycache__/
 via-india-lambda/app/__pycache__/
 via-india-requests-bruno/*
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
+agent-resources/*
+.DS_Store
+*/.DS_Store
