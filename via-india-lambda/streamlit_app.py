@@ -121,16 +121,17 @@ def page_requests():
     # Try to auto-lookup user by email if not yet loaded
     if not st.session_state.via_user:
         with st.spinner("Looking up your account..."):
+            lookup_email = st.user.email
             try:
-                existing = api.get_user_by_email(st.user.email)
+                existing = api.get_user_by_email(lookup_email)
                 if existing:
                     # Auto-verify if pending (Google OAuth already verified email)
                     if existing.get("verification_status") != "verified":
                         api.verify_user(existing["user_id"])
                         existing["verification_status"] = "verified"
                     st.session_state.via_user = existing
-            except Exception:
-                pass  # Fall through to registration form
+            except Exception as e:
+                st.warning(f"⚠️ Could not look up account for `{lookup_email}`: {e}")
 
     if not st.session_state.via_user:
         st.info("No account found for your email. Register to get started.")
