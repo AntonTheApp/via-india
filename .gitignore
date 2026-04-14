@@ -17,3 +17,7 @@ via-india-requests-bruno/*
 agent-resources/*
 .DS_Store
 */.DS_Store
+
+# Streamlit secrets
+.streamlit/secrets.toml
+via-india-lambda/.streamlit/secrets.toml

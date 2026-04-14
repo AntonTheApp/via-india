@@ -383,6 +383,7 @@ python run_local.py
 ```
 
 #### **AWS Deployment (Production)**
+
 ```bash
 # Set up CDK environment
 cd via-india-cdk
@@ -395,9 +396,25 @@ cdk deploy ViaIndiaDatabaseStack
 cdk deploy ViaIndiaLayerStack
 cdk deploy ViaIndiaCdkStack
 
+# Deploy the Streamlit App Runner stack
+cdk deploy ViaIndiaStreamlitAppStack
+
 # Regular development (code changes only)
 cdk deploy ViaIndiaCdkStack
 ```
+
+#### Streamlit App Build/Deploy Checklist
+- Make sure `via-india-lambda/requirements-dev.txt` includes `streamlit` and all dependencies your app needs.
+- Ensure `via-india-lambda/Dockerfile` exists and is up to date:
+  - It should copy both `requirements-dev.txt` and `streamlit_app.py` (and any other needed files).
+- Before deploying, test the build locally:
+```bash
+cd via-india-lambda
+docker build -t streamlit-test .
+docker run -p 8501:8501 streamlit-test
+# Visit http://localhost:8501 to verify the app works
+```
+- If the local Docker build works, the App Runner deployment should succeed.
 
 #### **Phase 2 Setup** (Future)
 ```bash

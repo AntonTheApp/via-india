@@ -28,6 +28,6 @@ app_stack = ViaIndiaCdkStack(app, "ViaIndiaCdkStack",
 # Ensure proper deployment order
 app_stack.add_dependency(database_stack)
 # Uncomment when python dependencies change
-# app_stack.add_dependency(layer_stack)
+app_stack.add_dependency(layer_stack)
 
 app.synth()
