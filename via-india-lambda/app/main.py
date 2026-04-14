@@ -52,7 +52,7 @@ async def create_user(user_data: UserCreateRequest):
     logger.info(f"API: Creating user account for email {user_data.email}")
     try:
         # Validate company domain (you can customize this)
-        allowed_domains = ["example.com"]  # Add your company domains
+        allowed_domains = ["gmail.com"]  # Add your company domains
         domain = user_data.email.split('@')[1]
         logger.info(f"API: Validating domain {domain} against allowed domains")
 

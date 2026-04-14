@@ -114,12 +114,26 @@ def page_home():
 def page_requests():
     st.title("✈️ My Requests")
 
-    # --- Register / lookup user by email ---
+    # --- Auto-detect or register user by Google email ---
     if "via_user" not in st.session_state:
         st.session_state.via_user = None
 
+    # Try to auto-lookup user by email if not yet loaded
     if not st.session_state.via_user:
-        st.info("First, register or link your account to start using the platform.")
+        with st.spinner("Looking up your account..."):
+            try:
+                existing = api.get_user_by_email(st.user.email)
+                if existing:
+                    # Auto-verify if pending (Google OAuth already verified email)
+                    if existing.get("verification_status") != "verified":
+                        api.verify_user(existing["user_id"])
+                        existing["verification_status"] = "verified"
+                    st.session_state.via_user = existing
+            except Exception:
+                pass  # Fall through to registration form
+
+    if not st.session_state.via_user:
+        st.info("No account found for your email. Register to get started.")
         with st.form("register_form"):
             reg_name = st.text_input("Full Name", value=st.user.name)
             reg_email = st.text_input("Email", value=st.user.email, disabled=True)
@@ -128,6 +142,9 @@ def page_requests():
             if submitted:
                 try:
                     user = api.create_user(reg_name, st.user.email, reg_phone)
+                    # Auto-verify since Google OAuth already confirmed the email
+                    api.verify_user(user["user_id"])
+                    user["verification_status"] = "verified"
                     st.session_state.via_user = user
                     st.success(f"Registered! Your user ID: `{user['user_id']}`")
                     st.rerun()

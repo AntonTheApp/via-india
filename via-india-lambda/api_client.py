@@ -55,10 +55,17 @@ def get_user(user_id: str) -> dict:
     return _handle_response(resp)
 
 
-def verify_user(email: str) -> dict:
+def get_user_by_email(email: str) -> dict | None:
+    """Lookup user by email. Returns None if not found."""
+    resp = requests.get(f"{_base_url()}/users/email/{email}", headers=_headers(), timeout=10)
+    if resp.status_code == 404:
+        return None
+    return _handle_response(resp)
+
+
+def verify_user(user_id: str) -> dict:
     resp = requests.post(
-        f"{_base_url()}/users/verify",
-        params={"email": email},
+        f"{_base_url()}/users/{user_id}/verify",
         headers=_headers(),
         timeout=10,
     )
@@ -81,7 +88,6 @@ def create_request(
     helper_details: Optional[dict] = None,
 ) -> dict:
     payload = {
-        "user_id": user_id,
         "type": request_type,
         "route": {"origin": origin, "destination": destination},
         "travel_dates": {
@@ -96,7 +102,13 @@ def create_request(
     if helper_details:
         payload["helper_details"] = helper_details
 
-    resp = requests.post(f"{_base_url()}/requests", json=payload, headers=_headers(), timeout=10)
+    resp = requests.post(
+        f"{_base_url()}/requests",
+        json=payload,
+        params={"user_id": user_id},
+        headers=_headers(),
+        timeout=10,
+    )
     return _handle_response(resp)
 
 
