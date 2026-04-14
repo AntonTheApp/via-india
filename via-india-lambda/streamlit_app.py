@@ -1,4 +1,5 @@
 import streamlit as st
+import api_client as api
 
 st.set_page_config(page_title="Via India", page_icon="🌏", layout="centered")
 
@@ -96,8 +97,14 @@ def page_home():
     with col2:
         st.success("**Offer help?**\nLet others know you're available.")
 
+    # API health check
     st.divider()
-    st.caption("More features coming soon — request management, matching, and notifications.")
+    with st.expander("🔌 API Status"):
+        try:
+            status = api.health_check()
+            st.success(f"API is **{status.get('status', 'unknown')}**")
+        except Exception as e:
+            st.error(f"API unreachable: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +113,121 @@ def page_home():
 
 def page_requests():
     st.title("✈️ My Requests")
-    st.info("This section will let you create, view, and manage your travel requests and offers.")
-    st.caption("🚧 Under construction")
+
+    # --- Register / lookup user by email ---
+    if "via_user" not in st.session_state:
+        st.session_state.via_user = None
+
+    if not st.session_state.via_user:
+        st.info("First, register or link your account to start using the platform.")
+        with st.form("register_form"):
+            reg_name = st.text_input("Full Name", value=st.user.name)
+            reg_email = st.text_input("Email", value=st.user.email, disabled=True)
+            reg_phone = st.text_input("Phone (optional)")
+            submitted = st.form_submit_button("Register / Link Account")
+            if submitted:
+                try:
+                    user = api.create_user(reg_name, st.user.email, reg_phone)
+                    st.session_state.via_user = user
+                    st.success(f"Registered! Your user ID: `{user['user_id']}`")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        return
+
+    user = st.session_state.via_user
+    st.caption(f"User ID: `{user['user_id']}`")
+
+    # --- View existing requests ---
+    st.subheader("Your Requests")
+    try:
+        reqs = api.get_user_requests(user["user_id"])
+        if reqs:
+            for req in reqs:
+                with st.expander(
+                    f"{req['type']} — {req['route']['origin']} → {req['route']['destination']}  "
+                    f"({req['status']})"
+                ):
+                    st.json(req)
+                    if st.button("Find matches", key=f"match_{req['request_id']}"):
+                        try:
+                            matches = api.find_matches(req["request_id"])
+                            st.write(f"**{matches['matches_found']}** potential match(es) found")
+                            if matches["matches"]:
+                                for m in matches["matches"]:
+                                    st.write(
+                                        f"- {m['type']} | {m['route']['origin']} → "
+                                        f"{m['route']['destination']} | "
+                                        f"Departs: {m['travel_dates'].get('departure', 'N/A')}"
+                                    )
+                            else:
+                                st.caption("No matches yet — check back later.")
+                        except Exception as e:
+                            st.error(f"Matching error: {e}")
+        else:
+            st.caption("No requests yet. Create one below!")
+    except Exception as e:
+        st.error(f"Error loading requests: {e}")
+
+    # --- Create new request ---
+    st.divider()
+    st.subheader("Create a New Request")
+    with st.form("new_request_form"):
+        req_type = st.selectbox("Type", ["need_help", "offer_help"])
+        col_a, col_b = st.columns(2)
+        with col_a:
+            origin = st.text_input("Origin airport code", placeholder="DEL")
+        with col_b:
+            dest = st.text_input("Destination airport code", placeholder="JFK")
+        departure = st.date_input("Departure date")
+        return_date = st.date_input("Return date (optional)", value=None)
+        flexible = st.checkbox("Flexible dates")
+
+        if req_type == "need_help":
+            st.markdown("**Passenger Details**")
+            p_name = st.text_input("Passenger name")
+            p_age = st.number_input("Age", min_value=1, max_value=120, value=60)
+            p_needs = st.text_input("Special needs (optional)")
+            p_langs = st.text_input("Languages (comma-separated)", value="Hindi, English")
+        else:
+            st.markdown("**Helper Details**")
+            h_exp = st.text_input("Travel experience")
+            h_langs = st.text_input("Languages (comma-separated)", value="Hindi, English")
+            h_avail = st.text_input("Availability notes")
+
+        create_btn = st.form_submit_button("Submit Request")
+        if create_btn:
+            try:
+                passenger = None
+                helper = None
+                if req_type == "need_help":
+                    passenger = {
+                        "name": p_name,
+                        "age": p_age,
+                        "special_needs": p_needs,
+                        "languages": [l.strip() for l in p_langs.split(",") if l.strip()],
+                    }
+                else:
+                    helper = {
+                        "experience": h_exp,
+                        "languages": [l.strip() for l in h_langs.split(",") if l.strip()],
+                        "availability": h_avail,
+                    }
+                result = api.create_request(
+                    user_id=user["user_id"],
+                    request_type=req_type,
+                    origin=origin.upper(),
+                    destination=dest.upper(),
+                    departure=str(departure),
+                    return_date=str(return_date) if return_date else None,
+                    flexible=flexible,
+                    passenger_details=passenger,
+                    helper_details=helper,
+                )
+                st.success(f"Request created! ID: `{result['request_id']}`")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error creating request: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +236,25 @@ def page_requests():
 
 def page_matches():
     st.title("🔍 Find Matches")
-    st.info("This section will display potential matches for your travel requests.")
-    st.caption("🚧 Under construction")
+    st.markdown("Enter a request ID to search for compatible travel companions.")
+
+    request_id = st.text_input("Request ID")
+    if st.button("Search", disabled=not request_id):
+        try:
+            result = api.find_matches(request_id)
+            st.write(f"**{result['matches_found']}** match(es) found")
+            if result["matches"]:
+                for m in result["matches"]:
+                    st.markdown(
+                        f"- **{m['type']}** | {m['route']['origin']} → "
+                        f"{m['route']['destination']} | "
+                        f"Departs: {m['travel_dates'].get('departure', 'N/A')} | "
+                        f"User: `{m['user_id']}`"
+                    )
+            else:
+                st.info("No matches found yet. Check back later!")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +263,18 @@ def page_matches():
 
 def page_settings():
     st.title("⚙️ Settings")
-    st.info("Profile and notification preferences will go here.")
-    st.caption("🚧 Under construction")
+
+    st.subheader("Your Profile")
+    st.markdown(f"**Name:** {st.user.name}")
+    st.markdown(f"**Email:** {st.user.email}")
+
+    if st.session_state.get("via_user"):
+        user = st.session_state.via_user
+        st.markdown(f"**User ID:** `{user['user_id']}`")
+        st.markdown(f"**Verification:** {user.get('verification_status', 'unknown')}")
+
+    st.divider()
+    st.caption("More settings (notification preferences, profile updates) coming soon.")
 
 
 # ---------------------------------------------------------------------------

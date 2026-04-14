@@ -1,10 +1,12 @@
 from aws_cdk import (
+    CfnOutput,
     Duration,
     Stack,
     Fn,
     aws_lambda as _lambda,
     aws_apigateway as apigw,
     aws_dynamodb as dynamodb,
+    aws_iam as iam,
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -76,5 +78,47 @@ class ViaIndiaCdkStack(Stack):
         api = apigw.LambdaRestApi(
             self, "TravelCompanionAPI",
             handler=fastapi_lambda,
-            proxy=True
+            proxy=True,
+            endpoint_types=[apigw.EndpointType.REGIONAL],
+            api_key_source_type=apigw.ApiKeySourceType.HEADER,
+            policy=iam.PolicyDocument(
+                statements=[
+                    iam.PolicyStatement(
+                        effect=iam.Effect.ALLOW,
+                        principals=[iam.AnyPrincipal()],
+                        actions=["execute-api:Invoke"],
+                        resources=["execute-api:/*"],
+                    )
+                ]
+            ),
+            default_method_options=apigw.MethodOptions(
+                authorization_type=apigw.AuthorizationType.NONE,
+                api_key_required=True,
+            ),
+        )
+
+        # Create API Key
+        api_key = api.add_api_key("ViaIndiaApiKey",
+            api_key_name="via-india-streamlit-key",
+        )
+
+        # Create Usage Plan and associate with API + API Key
+        usage_plan = api.add_usage_plan("ViaIndiaUsagePlan",
+            name="via-india-standard",
+            throttle=apigw.ThrottleSettings(
+                rate_limit=50,     # requests per second
+                burst_limit=100,   # burst capacity
+            ),
+        )
+        usage_plan.add_api_key(api_key)
+        usage_plan.add_api_stage(stage=api.deployment_stage)
+
+        # Output the API URL and Key ID
+        CfnOutput(self, "ApiUrl",
+            value=api.url,
+            description="API Gateway endpoint URL",
+        )
+        CfnOutput(self, "ApiKeyId",
+            value=api_key.key_id,
+            description="API Key ID — retrieve the actual key value from the AWS Console or CLI",
         )

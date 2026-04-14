@@ -20,4 +20,4 @@ agent-resources/*
 
 # Streamlit secrets
 .streamlit/secrets.toml
-via-india-lambda/.streamlit/secrets.toml
+via-india-lambda/.streamlit/secrets.tomlvia-india-lambda/__pycache__/
